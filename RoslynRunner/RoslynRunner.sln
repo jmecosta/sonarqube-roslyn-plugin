@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RoslynRunner", "RoslynRunner\RoslynRunner.fsproj", "{504F4169-B41D-431F-B31E-E72E0FE2495C}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "RoslynRunner.Test", "RoslynRunner.Test\RoslynRunner.Test.fsproj", "{97E76AE8-D602-400E-8F4B-0F82204C6A84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassLibrary1", "ClassLibrary1\ClassLibrary1.csproj", "{46767F79-6995-4D8F-91D3-0527F854E732}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{504F4169-B41D-431F-B31E-E72E0FE2495C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{504F4169-B41D-431F-B31E-E72E0FE2495C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{504F4169-B41D-431F-B31E-E72E0FE2495C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{504F4169-B41D-431F-B31E-E72E0FE2495C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97E76AE8-D602-400E-8F4B-0F82204C6A84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97E76AE8-D602-400E-8F4B-0F82204C6A84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97E76AE8-D602-400E-8F4B-0F82204C6A84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97E76AE8-D602-400E-8F4B-0F82204C6A84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46767F79-6995-4D8F-91D3-0527F854E732}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46767F79-6995-4D8F-91D3-0527F854E732}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46767F79-6995-4D8F-91D3-0527F854E732}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46767F79-6995-4D8F-91D3-0527F854E732}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
