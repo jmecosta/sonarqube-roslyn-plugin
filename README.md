@@ -19,6 +19,18 @@ Use visual studio or netbeans, and create pull requests.
 ## Installation
 Copy jar to extension/plugins in you sonarqube server instance. Restart,
 
+## Alternatives
+https://github.com/SonarSource-VisualStudio/sonarlint-visualstudio
+https://github.com/SonarSource-VisualStudio/sonarqube-roslyn-sdk/ you can code your own solution for your analysers.
+
+## why
+So far Sonarlint is quite verbose to the solution you are installing, managing multiple solutions is a very tedious work and updating each version will cause huge ammount of changes into project files. Now try to handle a project that contains dozens of solutions and you can find yourself spending huge ammounts of time maintaining those.
+
+The idea of this, in conjuntion with VSSonarQubeExtension (https://github.com/TrimbleSolutionsCorporation/VSSonarQubeExtension), is that you dont need to touch your project files to accomplish similar experience as SonarLint. You just install the VSSonarQubeExtension, install the plugin in SonarQube, setup the location of your diagnostics (you can distribute those any way you like, we are using choco) and you are all set. All solutions that you work are sharing the same environment.
+
+Updates are also easy to handle, you just update the diagnostics and you are all set.
+
+Synchronization of settings is handle in SonarQube ui, so your users dont need to worry about anything.
 
 ## Usage
-todo
+There are multiple ways of using it, but the simplest is to drop your analysers in some external location to the solution. Choco is a nice way of distributing those. And setup that path via SonarQube ui. And you are done.
