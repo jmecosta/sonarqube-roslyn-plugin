@@ -32,7 +32,7 @@ Updates are also easy to handle, you just update the diagnostics and you are all
 
 Synchronization of settings is handle in SonarQube ui, so your users dont need to worry about anything.
 
-Ah and if you use Visual Studio 2013 your are in lucky, you can you this there.
+Ah and if you use Visual Studio 2013 your are in luck, you can you this there.
 
 ## Usage
 There are multiple ways of using it, but the simplest is to drop your analysers in some external location to the solution. Choco is a nice way of distributing those. And setup that path via SonarQube ui. And you are done.
