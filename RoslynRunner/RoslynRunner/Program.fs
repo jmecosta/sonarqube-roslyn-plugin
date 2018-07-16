@@ -76,57 +76,67 @@ let main argv =
                     File.Delete(output)
 
                 let username = try arguments.["u"] |> Seq.head with | ex -> "admin"
-                let userpassword = try arguments.["p"] |> Seq.head with | ex -> "admin"
+                let userpassword = try arguments.["p"] |> Seq.head with | ex -> if username = "admin" then "admin" else ""
 
-                let options = new XmlHelper.OptionsToUse()
-                options.ParseOptions(input)
+                let optionsInput = XmlHelper.InputXml.Parse(File.ReadAllText(input))
 
-                let skipFile = Path.Combine(options.Root, ".sonarqube", "bin", "skip")
-                if not(File.Exists(skipFile)) then
-
-                    let rest = new SonarRestService(new JsonSonarConnector())
-                    let token = SonarHelpers.GetConnectionToken(rest, options.Url, username, userpassword)
-
-                    if arguments.ContainsKey("deleteallrules") then
-                        let profiles = SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, true)
-                        if profiles.ContainsKey("cs") then SonarHelpers.DeleteRoslynRulesInProfiles(rest, token, profiles.["cs"])
-                        if profiles.ContainsKey("vbnet") then SonarHelpers.DeleteRoslynRulesInProfiles(rest, token, profiles.["vbnet"])
+                let solutionPath =
+                    if Path.IsPathRooted(optionsInput.Settings.SolutionToUse) then
+                        optionsInput.Settings.SolutionToUse
                     else
-                        printf "[RoslynRunner] : Populate Diagnostics\r\n"
-                        let diagnosticRefs = GetDiagnostics(options.Solution, options.ExtenalDiagnostics, options.Root)
-                        printf "[RoslynRunner] : Sync Rules in Server\r\n"
-                        let diagnostics = SonarHelpers.SyncRulesInServer(diagnosticRefs, options.Root, rest, token, options.EnableRules, options.ProjectKey, true)
+                        Path.Combine(optionsInput.Settings.SolutionRoot, optionsInput.Settings.SolutionToUse)
 
-                        let profiles = 
-                            if options.UseWebProfile then
-                                printf "[RoslynRunner] : Use Web Profile : Delete Complete Profile\r\n"
-                                SonarHelpers.DeleteCompleteProfile(token, rest, options.ProjectKey)
-                                printf "[RoslynRunner] : Get Profiles\r\n"
-                                SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, false)
-                            else
-                                // read rule set and enable all rules that might be disabled
-                                printf "[RoslynRunner] : Create and Assign Profile in Server\r\n"
-                                SonarHelpers.CreateAndAssignProfileInServer(options.ProjectKey, rest, token, diagnostics)
-                            
+                let solutiondata = MSBuildHelper.CreateSolutionData(solutionPath)
+                let mutable diagnostiResults : Diagnostic list = List.Empty
+                let options = new XmlHelper.OptionsToUse()
+                options.ParseOptions(solutionPath, optionsInput)
+                let rest = new SonarRestService(new JsonSonarConnector()) :> ISonarRestService
+                let token = SonarHelpers.GetConnectionToken(rest, options.Url, username, userpassword)
+                if arguments.ContainsKey("deleteallrules") then
+                    let profiles = SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, true)
+                    if profiles.ContainsKey("cs") then SonarHelpers.DeleteRoslynRulesInProfiles(rest, token, profiles.["cs"])
+                    if profiles.ContainsKey("vbnet") then SonarHelpers.DeleteRoslynRulesInProfiles(rest, token, profiles.["vbnet"])
+                elif arguments.ContainsKey("deletealldiagnosticsfromserver") then
+                    let diagnosticRefs = GetDiagnostics(options.Solution, options.ExtenalDiagnostics, options.Root)
+                    let diagnostics = SonarHelpers.SyncRulesInServer(diagnosticRefs, options.Root, rest, token, options.EnableRules, options.ProjectKey, true)
+
+                    for diagnostic in diagnostics do
+                        for diag in diagnostic.Value do
+                            for sup in diag.Analyser.SupportedDiagnostics do
+                                let rule = Rule()
+                                rule.Key <- "roslyn-cs:" + sup.Id
+                                let result = rest.DeleteRule(token, rule)
+                                printf "result: %A" result
+                else                    
+                    printf "[RoslynRunner] : ProjectKey: %s \r\n" options.ProjectKey
+                    printf "[RoslynRunner] : Populate Diagnostics\r\n"
+                    let diagnosticRefs = GetDiagnostics(options.Solution, options.ExtenalDiagnostics, options.Root)
+                    printf "[RoslynRunner] : Sync Rules in Server\r\n"
+                    let diagnostics = SonarHelpers.SyncRulesInServer(diagnosticRefs, options.Root, rest, token, options.EnableRules, options.ProjectKey, true)
+                    let profiles = 
+                        if options.UseWebProfile then
+                            printf "[RoslynRunner] : Use Web Profile : Delete Complete Profile\r\n"
+                            SonarHelpers.DeleteCompleteProfile(token, rest, options.ProjectKey)
+                            printf "[RoslynRunner] : Get Profiles\r\n"
+                            SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, false)
+                        else
+                            // read rule set and enable all rules that might be disabled
+                            printf "[RoslynRunner] : Create and Assign Profile in Server\r\n"
+                            SonarHelpers.CreateAndAssignProfileInServer(options.ProjectKey, rest, token, diagnostics)
+
+                    for project in solutiondata.Projects do
+                        printf "[RoslynRunner] : Analyse: %s \r\n" project.Value.Path
+                        options.PopulateProjectOptions(project.Value.Path)
                         if diagnostics.Count = 0 then
                             printf "[RoslynRunner] : No diagnostics configured or found : see https://sites.google.com/site/jmecsoftware/ for more information\r\n"
-                            
                         else
-                            let mutable skippedAll = true
                             for dll in diagnostics do
                                 if dll.Value.Length <> 0 then
                                     printf "[RoslynRunner] : Run analyzers in : %s\r\n" dll.Key
-                                    let resourceswithissues, skipped = RoslynHelper.RunAnalysis(profiles, dll.Value, options)
+                                    let resourceswithissues = RoslynHelper.RunAnalysis(profiles, dll.Value, options)
+                                    resourceswithissues |> Seq.iter (fun x -> diagnostiResults <- diagnostiResults @ [x])
 
-                                    if not(skipped) then
-                                        printf "[RoslynRunner] : Will not create skip file"
-                                        skippedAll <- false
-
-                                    XmlHelper.WriteToOutputFile(output, resourceswithissues)
-
-                            if skippedAll then
-                                File.WriteAllText(skipFile, "skip")
-
+                    XmlHelper.WriteToOutputFile(output, diagnostiResults)
             with
             | ex -> printf "    Failed: %A" ex
         ()

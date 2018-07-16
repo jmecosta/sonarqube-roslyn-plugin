@@ -45,9 +45,14 @@ let CreateRulesWithDiagnostic(path : string, profiles : System.Collections.Gener
                         rule.Key <- repoinserver + ":" + diag.Id
                         rule.Name <- diag.Title.ToString()
                         rule.Repo <- repoinserver
-                        let errors = rest.CreateRule(token, rule, templaterule)
+                        let mutable errors = new System.Collections.Generic.List<string>()
                         let dic = new System.Collections.Generic.Dictionary<string, string>()
-                        dic.Add("markdown_description", markdown)
+                        try
+                            errors <- rest.CreateRule(token, rule, templaterule)
+                            dic.Add("markdown_description", markdown)
+                        with
+                        | ex -> errors.Add("Error: " + ex.Message)
+
                         if errors.Count <> 0 then
                             printf "Cannot create rule in server %s due %s\n\r" diag.Id errors.[0]
                         else    
@@ -60,9 +65,12 @@ let CreateRulesWithDiagnostic(path : string, profiles : System.Collections.Gener
 
                             // enable rule
                             if enableRule then
-                                let errors = rest.ActivateRule(token, rule.Key, rule.Severity.ToString(), profile.Key)
-                                if errors.Count <> 0 then
-                                    printf "Cannot enable rule in server %s due %s\n\r" rule.Key errors.[0]
+                                try
+                                    let errors = rest.ActivateRule(token, rule.Key, rule.Severity.ToString(), profile.Key)
+                                    if errors <> "" then
+                                        printf "Cannot enable rule in server %s due %s\n\r" rule.Key errors
+                                with
+                                | _ -> ()
     diags
 
 let GetProfilesFromServer(projectKey : string,
@@ -140,8 +148,9 @@ let CreateAndAssignProfileInServer(projectKey : string,
                         for supdiag in diag.Analyser.SupportedDiagnostics do
                             let rule = profilenew.GetRule(repoid + ":" + supdiag.Id)
                             if rule <> null then
-                                for msg in service.ActivateRule(token, rule.Key, rule.Severity.ToString(), profilenew.Key) do
-                                    printf "Cannot enable rule %s - %s\r\n" rule.Key msg
+                                let error = service.ActivateRule(token, rule.Key, rule.Severity.ToString(), profilenew.Key)
+                                if error <> "" then
+                                    printf "Cannot enable rule %s - %s\r\n" rule.Key error
 
             // set parent profile so users can manage the rest of the profile
             let msg = service.ChangeParentProfile(token, profilenew.Key, parentprofileKey)

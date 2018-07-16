@@ -1,16 +1,17 @@
 <?xml version="1.0"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <groupId>org.sonarsource.sonar-plugins</groupId>
+    <groupId>org.sonarsource.parent</groupId>
     <artifactId>parent</artifactId>
-    <version>22</version>
-  </parent>
+    <version>44</version>
+  </parent> 
 
   <groupId>org.jmecsoftware.com.sonar-plugins.dotnet.roslyn</groupId>
   <artifactId>sonar-roslyn-squid</artifactId>
   <packaging>pom</packaging>
-  <version>0.9-SNAPSHOT</version>
+  <version>1.0.0</version>
 
   <name>SonarQube Roslyn Plugin</name>
   <inceptionYear>2016</inceptionYear>
@@ -25,10 +26,9 @@
   </modules>
 
   <properties>
-    <sonar.version>4.5.2</sonar.version>
+    <sonar.version>6.7</sonar.version>
     <license.owner>jmecsoftware.com</license.owner>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <bintray.package>sonar-roslyn-plugin</bintray.package>
   </properties>
 
   <licenses>

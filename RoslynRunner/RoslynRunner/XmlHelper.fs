@@ -64,7 +64,6 @@ type InputXml = XmlProvider<"""
       <SolutionRoot>path</SolutionRoot>
       <SonarUrl>http://sonar</SonarUrl>
       <ProjectKey>key</ProjectKey>
-      <ModuleKey>key</ModuleKey>
       <BranchKey>key</BranchKey>      
       <EnableRules>true</EnableRules>   
       <UseSonarWebProfile>true</UseSonarWebProfile>   
@@ -136,14 +135,11 @@ type OptionsToUse() =
     member val DisableIds : Set<string> = Set.empty with get, set
     member val UseWebProfile : bool = true with get, set
     member val ProjectKey : string = "" with get, set
-    member val ModuleKey : string = "" with get, set
     member val EnableRules : bool = true with get, set
-    member val ProjectKeyGuid : string = "" with get, set
     member val ProjectPath : string = "" with get, set
     member val ExtenalDiagnostics : string [] = [||] with get, set
 
-    member this.ParseOptions(input : String) =
-        let options = InputXml.Parse(File.ReadAllText(input))
+    member this.ParseOptions(solutionPath:string, options:InputXml.AnalysisInput) =
 
         this.Url <- options.Settings.SonarUrl
         this.Root <- options.Settings.SolutionRoot
@@ -153,42 +149,18 @@ type OptionsToUse() =
         let userDiagnosticsDefaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "VSSonarExtension", "Diagnostics", "UserDiagnostics" )
         this.ExtenalDiagnostics <- (Array.append (options.Settings.ExternalDiagnostics.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)) [|userDiagnosticsDefaultPath|])
 
-        this.Solution <-
-            if Path.IsPathRooted(options.Settings.SolutionToUse) then
-                options.Settings.SolutionToUse
-            else
-                Path.Combine(this.Root, options.Settings.SolutionToUse)
+        this.Solution <- solutionPath
+        this.EnableRules <- try options.Settings.EnableRules with | ex -> true
+
 
         this.ProjectKey <- 
             if options.Settings.BranchKey <> "" then
-                options.Settings.ProjectKey + ":" + options.Settings.BranchKey                
+                options.Settings.ProjectKey + ":" + options.Settings.BranchKey
             else
                 options.Settings.ProjectKey
 
-        this.ModuleKey <- options.Settings.ModuleKey
-        this.EnableRules <- try options.Settings.EnableRules with | ex -> true
-        this.ProjectKeyGuid <-
-            try
-                let elems = 
-                    if options.Settings.BranchKey <> "" then
-                        options.Settings.ModuleKey.Replace(":" + options.Settings.BranchKey, "").Split(':')
-                    else
-                        options.Settings.ModuleKey.Split(':')
-
-                elems.[elems.Length - 1]
-            with
-            | ex ->
-                let data = (sprintf "Unable to Process Module Key : %s %s" options.Settings.ModuleKey ex.Message)
-                printf "[RoslynRunnerPlugin] : %s\r\n" data
-                ""
-
-        this.ProjectPath <-
-            let solutiondata = MSBuildHelper.CreateSolutionData(this.Solution)
-            let matchdata = solutiondata.Projects |> Seq.tryFind (fun c -> c.Key.Equals(new Guid(this.ProjectKeyGuid)))
-            match matchdata with
-            | Some value -> value.Value.Path
-            | _ -> ""
-
+    member this.PopulateProjectOptions(projectPath:string) =
+        this.ProjectPath <- projectPath
         if File.Exists(this.ProjectPath) then
             let data = ProjectFile.Parse(File.ReadAllText(this.ProjectPath))
             for itemgroup in data.ItemGroups do

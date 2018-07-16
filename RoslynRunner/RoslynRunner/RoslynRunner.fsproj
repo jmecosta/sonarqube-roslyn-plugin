@@ -11,7 +11,7 @@
     <AssemblyName>RoslynRunner</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <TargetFSharpCoreVersion>4.4.3.0</TargetFSharpCoreVersion>
     <Name>RoslynRunner</Name>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
@@ -30,8 +30,7 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\Debug\FsSonarRunner.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
-    <StartArguments>
-    </StartArguments>
+    <StartArguments>/i D:\prod\extensions-ts\drawrebarpullouts\roslyn-analysis-input.xml /u: /o:D:\prod\extensions-ts\drawrebarpullouts\roslyn-analysis-output.xml</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -71,12 +70,10 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Data">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\FSharp.Data.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\FSharp.Data.dll</HintPath>
     </Reference>
     <Reference Include="FSharp.Data.DesignTime">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\FSharp.Data.DesignTime.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\FSharp.Data.DesignTime.dll</HintPath>
     </Reference>
     <Reference Include="log4net">
       <HintPath>..\packages\log4net.2.0.0\lib\net40-full\log4net.dll</HintPath>
@@ -111,20 +108,17 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="MsbuildAutomationHelper">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\MsbuildAutomationHelper.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\MsbuildAutomationHelper443.1.5.1\lib\MsbuildAutomationHelper.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
     <Reference Include="RestSharp">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\RestSharp.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\RestSharp.dll</HintPath>
     </Reference>
     <Reference Include="SonarRestService">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\SonarRestService.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\SonarRestService.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Collections.Immutable">
@@ -160,12 +154,10 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="VSSonarPlugins">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\VSSonarPlugins.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\VSSonarPlugins.dll</HintPath>
     </Reference>
     <Reference Include="VSSonarQubeCmdExecutor">
-      <HintPath>..\packages\VSSonarExtensionPlugin4Api.5.1.14\lib\VSSonarQubeCmdExecutor.dll</HintPath>
-      <Private>True</Private>
+      <HintPath>..\packages\VSSonarExtensionPlugin43Api.7.1.1\lib\VSSonarQubeCmdExecutor.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

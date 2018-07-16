@@ -168,7 +168,6 @@ let runRoslynOnCompilationUnit(compilation : Compilation, ids, builder : Diagnos
 
 let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile>, roslynCheckers : RosDiag List, options : XmlHelper.OptionsToUse) =
     let mutable issuestoret = List.Empty
-    let mutable skipped = false
 
     try
         use workspace = MSBuildWorkspace.Create()
@@ -192,18 +191,15 @@ let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile
         if ids.Length > 0 then
             for project in solution.Projects do
                 if options.ProjectPath = "" || project.FilePath.ToLower().Equals(options.ProjectPath.ToLower()) then
-                    let specificDiagnosticsOptions = project.CompilationOptions.SpecificDiagnosticOptions
-                    for dig in specificDiagnosticsOptions do
-                        printf "diagnostic %i %s\r\n" project.CompilationOptions.SpecificDiagnosticOptions.Count dig.Key
                     let compilation = project.GetCompilationAsync().Result
-            
-
+                    let specificDiagnosticsOptions = project.CompilationOptions.SpecificDiagnosticOptions
                     if project.Language.ToString().Equals("C#") then
                         let result = runRoslynOnCompilationUnit(compilation, ids.ToImmutableDictionary(), csharpDiags, project.AdditionalDocuments, options.AdditionalFiles, options.UseWebProfile)
-
                         for issue in result do
                             let add = 
                                 if not(options.UseWebProfile) then
+                                    for dig in specificDiagnosticsOptions do
+                                        printf "diagnostic %A %s\r\n" dig.Value dig.Key
                                     if specificDiagnosticsOptions.Count <> 0 then
                                         try
                                             not(specificDiagnosticsOptions.[issue.Id].Equals(ReportDiagnostic.Suppress))
@@ -232,6 +228,8 @@ let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile
                         for issue in result do
                             let add = 
                                 if not(options.UseWebProfile) then
+                                    for dig in specificDiagnosticsOptions do
+                                        printf "diagnostic %A %s\r\n" dig.Value dig.Key
                                     if specificDiagnosticsOptions.Count <> 0 then
                                         try
                                             not(specificDiagnosticsOptions.[issue.Id].Equals(ReportDiagnostic.Suppress))
@@ -257,11 +255,10 @@ let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile
 
         else
             printf "[RoslynRunner] : No diagnostics enabled, skip execution.\n\r"
-            skipped <- true
 
     with
     | ex -> 
         printf "Failed to run diagnostics %s \r\n %s\n\r" ex.Message ex.StackTrace
 
     printf "[RoslynRunner] : Found %i issues\r\n" issuestoret.Length
-    issuestoret, skipped
+    issuestoret

@@ -1,7 +1,7 @@
 /*
  * Sonar Roslyn Plugin :: Core
- * Copyright (C) 2016 jmecsoftware.com
- * sonarqube@googlegroups.com
+ * Copyright (C) 2016-2018 jmecsoftware.com
+ * mailto:info AT sonarsource DOT com
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -13,94 +13,115 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+/*
+ * Sonar Roslyn Plugin, open source software quality management tool.
+ * Author(s) : Jorge Costa @ jmecsoftware.com
+ *
+ * Sonar Roslyn Plugin is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * Sonar Roslyn Plugin is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  */
 package org.sonar.plugins.roslyn;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
 import java.io.BufferedReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import org.sonar.api.batch.DependedUpon;
-import org.sonar.api.batch.Sensor;
-import org.sonar.api.batch.SensorContext;
 import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.batch.fs.InputFile;
-import org.sonar.api.component.ResourcePerspectives;
-import org.sonar.api.config.Settings;
-import org.sonar.api.issue.Issuable;
-import org.sonar.api.resources.Project;
 import org.sonar.api.rule.RuleKey;
 import org.sonar.api.utils.command.Command;
 import org.sonar.api.utils.command.CommandExecutor;
 import org.sonar.api.utils.command.StreamConsumer;
-import org.sonar.api.batch.bootstrap.ProjectReactor;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.Map;
+import org.sonar.api.batch.sensor.Sensor;
+import org.sonar.api.batch.sensor.SensorContext;
+import org.sonar.api.batch.sensor.SensorDescriptor;
+import org.sonar.api.batch.sensor.issue.NewIssue;
+import org.sonar.api.batch.sensor.issue.NewIssueLocation;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 
 @DependedUpon("RoslynRunnerExtractor")
 public class RoslynSensor implements Sensor {
-
-  private static final Logger LOG = LoggerFactory.getLogger(RoslynSensor.class);
-
-  private final Settings settings;
+  public static final Logger LOG = Loggers.get(RoslynSensor.class);
   private final RoslynRunnerExtractor extractor;
-  private final FileSystem fs;
-  private final ResourcePerspectives perspectives;
-  private final ProjectReactor reactor;
 
-  public RoslynSensor(Settings settings, RoslynRunnerExtractor extractor, FileSystem fs, ResourcePerspectives perspectives, 
-    ProjectReactor reactor) {
-    this.reactor = reactor;
-    this.settings = settings;
+  public RoslynSensor(RoslynRunnerExtractor extractor) {
     this.extractor = extractor;
-    this.fs = fs;
-    this.perspectives = perspectives;
   }
 
   public File[] finder(File dir, final String extension){
 
       return dir.listFiles(new FilenameFilter() { 
-               @Override
-               public boolean accept(File dir, String filename)
-                    { 
-                      return filename.endsWith(extension);
-                    }
+        @Override
+        public boolean accept(File dir, String filename)
+        { 
+          return filename.endsWith(extension);
+        }
       } );
   }
 
   @Override
-  public boolean shouldExecuteOnProject(Project project) {    
-    return fs.files(fs.predicates().hasLanguage(RoslynPlugin.CS_LANGUAGE_KEY)).iterator().hasNext() ||
-            fs.files(fs.predicates().hasLanguage(RoslynPlugin.VBNET_LANGUAGE_KEY)).iterator().hasNext();
+  public void describe(SensorDescriptor descriptor) {
+    descriptor.global().onlyOnLanguage(RoslynPlugin.CS_LANGUAGE_KEY).name("RoslynSensor");
   }
-  
-  private String getSolution() {
-    File workingDir = reactor.getRoot().getBaseDir();
-    File[] solutions = this.finder(workingDir, ".sln");
+
+  @Override
+  public void execute(SensorContext context) {
+    LOG.info("Execute Roslyn Sensor : " + context.fileSystem().baseDir());
+    try {
+      String solution = getSolution(context.fileSystem().baseDir(), context);
+      if ("".equals(solution)) {
+        LOG.info("Roslyn Sensor will skip. No solution found at this level");
+        return;
+      } 
+      analyze(context, solution);
+      importResults(context);
+    } catch (IOException ex) {
+      LOG.error("Failed to parse results file '{}'", ex.getMessage());
+      context.newAnalysisError().message("Failed to parse results file " +  ex.getMessage()).save();
+    }
+  }
+    
+  private String getSolution(File startFolder, SensorContext context) {
+    
+    if (startFolder == null) {
+      LOG.debug("RoslynSensor : No solution found");
+      return "";
+    }
+    File[] solutions = this.finder(startFolder, ".sln");
     if (solutions.length != 1) {
       if (solutions.length > 1) {
-        String solution = getEmptyStringOrValue(RoslynPlugin.SOLUTION_KEY);
+        String solution = getEmptyStringOrValue(context, RoslynPlugin.SOLUTION_KEY);
         if (solution == null || solution.isEmpty()) {
           LOG.error("RoslynSensor : More than one solution found, and none selected: use '{}'", RoslynPlugin.SOLUTION_KEY);
         } else {
           return solution; 
-        }        
+        }
+        
         for (File solutionprint : solutions) {          
           LOG.debug("RoslynSensor : Solution in root '{}'", solutionprint.getAbsolutePath());
         }        
       } else {
-        LOG.debug("RoslynSensor : No solution found in '{}' : will skip RoslynRunner", workingDir);
+        return getSolution(startFolder.getParentFile(), context);
       }
       return "";
     } else {
@@ -108,85 +129,63 @@ public class RoslynSensor implements Sensor {
     }    
   }
   
-  @Override
-  public void analyse(Project project, SensorContext context) {
-    analyze(project);    
-    try {
-      importResults();
-    } catch (IOException ex) {
-      LOG.error("Failed to parse results file '{}'", ex.getMessage());
+  private String getEmptyStringOrValue(SensorContext ctx, String key) {
+    if (ctx.config().get(key).isPresent()) {
+      return ctx.config().get(key).get();
     }
-  }
-
-  private String getEmptyStringOrValue(String key) {
-    String data = settings.getString(key);
-    if (data == null) {
-      return "";
-    }    
-    return data;
+    
+    return "";    
   }
   
-  private Map<String, String> buildAdditionalFileContents(Settings settings) {
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-    String[] additionalFilesIndexes = settings.getStringArray(RoslynPlugin.ADDITIONAL_FILES_KEY);
+  private Map<String, String> buildAdditionalFileContents(SensorContext cxt) {
+    Map<String, String> builder = new HashMap<String, String>();
+    String[] additionalFilesIndexes = cxt.config().getStringArray(RoslynPlugin.ADDITIONAL_FILES_KEY);
     for (String additionalFilesIndex : additionalFilesIndexes) {
-      String name = getEmptyStringOrValue(RoslynPlugin.ADDITIONAL_FILES_KEY + "." + additionalFilesIndex + "." + RoslynPlugin.ADDITIONAL_FILES_NAME_KEY);
-      String content = getEmptyStringOrValue(RoslynPlugin.ADDITIONAL_FILES_KEY + "." + additionalFilesIndex + "." + RoslynPlugin.ADDITIONAL_FILES_CONTENT_KEY);
+      String name = getEmptyStringOrValue(cxt, RoslynPlugin.ADDITIONAL_FILES_KEY + "." + additionalFilesIndex + "." + RoslynPlugin.ADDITIONAL_FILES_NAME_KEY);
+      String content = getEmptyStringOrValue(cxt, RoslynPlugin.ADDITIONAL_FILES_KEY + "." + additionalFilesIndex + "." + RoslynPlugin.ADDITIONAL_FILES_CONTENT_KEY);
       
       builder.put(name, content);
     }
-    return builder.build();
+    return builder;
   }
   
-  private void analyze(Project project) {  
-    
-    String solution = getSolution();
-    if ("".equals(solution)) {
-      return;
-    }
-    
-    Map<String, String> additionalFiles = buildAdditionalFileContents(this.settings);
+  private void analyze(SensorContext ctx, String solution) throws IOException {  
+        
+    Map<String, String> additionalFiles = buildAdditionalFileContents(ctx);
     
     String additionalFilesString = "";
     for(Map.Entry<String, String> entry : additionalFiles.entrySet()) {
       try {
-        File additionalFile = additionalIncludeFile(entry.getKey(), entry.getValue());
+        File additionalFile = additionalIncludeFile(entry.getKey(), entry.getValue(), ctx);
         additionalFilesString += additionalFilesString + additionalFile.getAbsolutePath() + ";";
       } catch (IOException ex) {
         LOG.error("Unable to create additional file for analysis '{}' '{}'", entry.getKey(), ex.getMessage());
       }      
     }
     
-    String moduleKey = getModuleKey(project);    
-    String projectKey = reactor.getRoot().getKey();
+    String projectKey = ctx.config().get("sonar.projectKey").get();
     StringBuilder sb = new StringBuilder();
     appendLine(sb, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     appendLine(sb, "<AnalysisInput>");
     appendLine(sb, "  <Settings>");
-    appendLine(sb, "      <SolutionToUse>" + (getSolution()) + "</SolutionToUse>");
-    appendLine(sb, "      <ExternalDiagnostics>" + (getEmptyStringOrValue(RoslynPlugin.DIAGNOSTICS_PATH_KEY)) + "</ExternalDiagnostics>");    
-    appendLine(sb, "      <SolutionRoot>" + reactor.getRoot().getBaseDir() + "</SolutionRoot>");
-    appendLine(sb, "      <SonarUrl>" + (getEmptyStringOrValue("sonar.host.url")) + "</SonarUrl>");
-    appendLine(sb, "      <ModuleKey>" + moduleKey + "</ModuleKey>");
+    appendLine(sb, "      <SolutionToUse>" + solution + "</SolutionToUse>");
+    appendLine(sb, "      <ExternalDiagnostics>" + (getEmptyStringOrValue(ctx, RoslynPlugin.DIAGNOSTICS_PATH_KEY)) + "</ExternalDiagnostics>");    
+    appendLine(sb, "      <SolutionRoot>" + ctx.fileSystem().baseDir() + "</SolutionRoot>");
+    appendLine(sb, "      <SonarUrl>" + (getEmptyStringOrValue(ctx, "sonar.host.url")) + "</SonarUrl>");
     appendLine(sb, "      <ProjectKey>" + projectKey + "</ProjectKey>");
-    appendLine(sb, "      <BranchKey>" + (getEmptyStringOrValue("sonar.branch")) + "</BranchKey>");
-    appendLine(sb, "      <EnableRules>" + (settings.getBoolean(RoslynPlugin.ENABLE_RULES_KEY) ? "true" : "false") + "</EnableRules>");
-    appendLine(sb, "      <UseSonarWebProfile>" + (settings.getBoolean(RoslynPlugin.SYNC_PROFILE_TYPE_KEY) ? "true" : "false") + "</UseSonarWebProfile>");
+    appendLine(sb, "      <BranchKey>" + (getEmptyStringOrValue(ctx, "sonar.branch")) + "</BranchKey>");
+    appendLine(sb, "      <EnableRules>" + (ctx.config().getBoolean(RoslynPlugin.ENABLE_RULES_KEY).get() ? "true" : "false") + "</EnableRules>");
+    appendLine(sb, "      <UseSonarWebProfile>" + (ctx.config().getBoolean(RoslynPlugin.SYNC_PROFILE_TYPE_KEY).get() ? "true" : "false") + "</UseSonarWebProfile>");
     appendLine(sb, "      <AdditionalFiles>" + additionalFilesString + "</AdditionalFiles>");
     appendLine(sb, "  </Settings>");
     appendLine(sb, "</AnalysisInput>");
 
-    File analysisInput = toolInput();
-    File analysisOutput = toolOutput();
+    File analysisInput = toolInput(ctx);
+    File analysisOutput = toolOutput(ctx);
 
-    try {
-      Files.write(sb, analysisInput, Charsets.UTF_8);
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
-    }
-
+    Files.write(analysisInput.toPath(), sb.toString().getBytes());
     File executableFile = extractor.executableFile();    
-    String extExec = getEmptyStringOrValue(RoslynPlugin.EXTERNAL_ANALYSER_PATH);
+    String extExec = getEmptyStringOrValue(ctx, RoslynPlugin.EXTERNAL_ANALYSER_PATH);
     
     if (!"".equals(extExec)) {
       File extFile = new File(extExec);
@@ -195,8 +194,8 @@ public class RoslynSensor implements Sensor {
       }      
     }
 
-    String username = getEmptyStringOrValue("sonar.login");
-    String password = getEmptyStringOrValue("sonar.password");
+    String username = getEmptyStringOrValue(ctx, "sonar.login");
+    String password = getEmptyStringOrValue(ctx, "sonar.password");
     
     Command command;
     if (OsUtils.isWindows()) {
@@ -219,9 +218,10 @@ public class RoslynSensor implements Sensor {
     CommandExecutor.create().execute(command, new LogInfoStreamConsumer(), new LogErrorStreamConsumer(), Integer.MAX_VALUE);
   }
 
-  private void importResults() throws FileNotFoundException, IOException {
-    File analysisOutput = toolOutput();
+  private void importResults(SensorContext ctx) throws FileNotFoundException, IOException {
+    File analysisOutput = toolOutput(ctx);
 
+    LOG.info("Import data from: " + analysisOutput);
     try(BufferedReader br = new BufferedReader(new FileReader(analysisOutput))) {
         for(String line; (line = br.readLine()) != null; ) {
           String [] elements = line.split(";");
@@ -235,18 +235,17 @@ public class RoslynSensor implements Sensor {
             repository = RoslynPlugin.REPOSITORY_KEY_VB;
           }          
           
-          InputFile inputFile = fs.inputFile(fs.predicates().is(new File(path)));
+          InputFile inputFile = ctx.fileSystem().inputFile(ctx.fileSystem().predicates().is(new File(path)));
           if (inputFile != null) {
-            Issuable issuable = perspectives.as(Issuable.class, inputFile);
-            if (issuable != null) {
-              issuable.addIssue(issuable.newIssueBuilder()
-                  .ruleKey(RuleKey.of(repository, id))
-                  .message(message)
-                  .line(Integer.parseInt(lineval))
-                  .build());
-            } else {
-              LOG.info("issuable not found - issue will not be imported: '{}' : '{}'", path, message);
-            }
+            NewIssue newIssue = ctx.newIssue().forRule(RuleKey.of(repository, id));
+            NewIssueLocation location = newIssue.newLocation()
+              .on(inputFile)
+              .at(inputFile.selectLine(Integer.parseInt(lineval)))
+              .message(message);
+
+            newIssue.at(location);
+            newIssue.save();
+         
           } else {
             LOG.info("inputFile not created - issue will not be imported: '{}' : '{}'", path, message);
           }
@@ -259,12 +258,14 @@ public class RoslynSensor implements Sensor {
     sb.append("\r\n");
   }
 
-  private String getModuleKey(Project project) {
-    if(project.isModule()) {
-      return project.getKey();
+    private String getModuleKey(SensorContext context) {
+    if(context.module().key() != "") {
+      return context.module().key();
     }    
     return "";
   }
+
+
 
   private static class LogInfoStreamConsumer implements StreamConsumer {
     @Override
@@ -280,17 +281,17 @@ public class RoslynSensor implements Sensor {
     }
   }
 
-  private File additionalIncludeFile(String fileName, String content) throws IOException {
-    File additionalFile = new File(fs.workDir(), fileName);    
-    Files.write(content, additionalFile, Charsets.UTF_8);
+  private File additionalIncludeFile(String fileName, String content, SensorContext ctx) throws IOException {
+    File additionalFile = new File(ctx.fileSystem().workDir(), fileName);    
+    Files.write(additionalFile.toPath(), content.getBytes());
     return additionalFile;    
   }
-  private File toolInput() {
-    return new File(fs.workDir(), "roslyn-analysis-input.xml");
+  private File toolInput(SensorContext ctx) {
+    return new File(ctx.fileSystem().workDir(), "roslyn-analysis-input.xml");
   }
 
-  private File toolOutput() {
-    return toolOutput(fs);
+  private File toolOutput(SensorContext ctx) {
+    return toolOutput(ctx.fileSystem());
   }
 
   public static File toolOutput(FileSystem fileSystem) {
