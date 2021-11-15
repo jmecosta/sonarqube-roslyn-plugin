@@ -69,6 +69,12 @@ public class RoslynPlugin implements Plugin {
       .defaultValue("true")
       .description("All created rules will be enabled in the current profile")
       .build(),
+      PropertyDefinition.builder(RoslynSensor.ROSLYN_SENSOR_ENABLED)
+      .name("Enable/Disable Sensor")
+      .type(PropertyType.BOOLEAN)
+      .defaultValue("true")
+      .description("Enables or disable roslyn sensor")
+      .build(),      
       PropertyDefinition.builder(RoslynPlugin.SYNC_PROFILE_TYPE_KEY)
       .name("Sync type")
       .type(PropertyType.BOOLEAN)

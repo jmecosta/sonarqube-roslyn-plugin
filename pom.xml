@@ -5,13 +5,13 @@
   <parent>
     <groupId>org.sonarsource.parent</groupId>
     <artifactId>parent</artifactId>
-    <version>44</version>
+    <version>52</version>
   </parent> 
 
   <groupId>org.jmecsoftware.com.sonar-plugins.dotnet.roslyn</groupId>
   <artifactId>sonar-roslyn-squid</artifactId>
   <packaging>pom</packaging>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
 
   <name>SonarQube Roslyn Plugin</name>
   <inceptionYear>2016</inceptionYear>

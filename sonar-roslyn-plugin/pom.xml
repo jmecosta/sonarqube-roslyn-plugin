@@ -5,7 +5,7 @@
   <parent>
       <groupId>org.jmecsoftware.com.sonar-plugins.dotnet.roslyn</groupId>
       <artifactId>sonar-roslyn-squid</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
   </parent>
   
   <artifactId>sonar-roslyn-plugin</artifactId>
@@ -56,15 +56,31 @@
 
   <build>
     <plugins>
-       <plugin>
-        <groupId>com.mycila.maven-license-plugin</groupId>
-        <artifactId>maven-license-plugin</artifactId>
-        <version>1.10.b1</version>
+      <plugin>
+        <groupId>com.mycila</groupId>
+        <artifactId>license-maven-plugin</artifactId>
+        <version>3.0</version>
         <configuration>
           <header>src/license-header.txt</header>
+          <properties>
+            <owner>Jorge Costa</owner>
+            <email>jmecosta@gmail.com</email>
+            <strictCheck>true</strictCheck>
+          </properties>
+          <excludes>
+            <exclude>**/README</exclude>
+            <exclude>src/**/**</exclude>
+          </excludes>
         </configuration>
-      </plugin> 
-      <plugin>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+     <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>

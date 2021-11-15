@@ -56,16 +56,22 @@ import org.sonar.api.batch.sensor.SensorContext;
 import org.sonar.api.batch.sensor.SensorDescriptor;
 import org.sonar.api.batch.sensor.issue.NewIssue;
 import org.sonar.api.batch.sensor.issue.NewIssueLocation;
+import org.sonar.api.config.Configuration;
 import org.sonar.api.utils.log.Logger;
 import org.sonar.api.utils.log.Loggers;
 
 @DependedUpon("RoslynRunnerExtractor")
 public class RoslynSensor implements Sensor {
+  
+  public static String ROSLYN_SENSOR_ENABLED = "sonar.roslyn.enabled";
+  
   public static final Logger LOG = Loggers.get(RoslynSensor.class);
   private final RoslynRunnerExtractor extractor;
+  private final Configuration settings;
 
-  public RoslynSensor(RoslynRunnerExtractor extractor) {
+  public RoslynSensor(RoslynRunnerExtractor extractor, Configuration settings) {
     this.extractor = extractor;
+    this.settings = settings;
   }
 
   public File[] finder(File dir, final String extension){
@@ -86,6 +92,16 @@ public class RoslynSensor implements Sensor {
 
   @Override
   public void execute(SensorContext context) {
+    if (!settings.getBoolean(ROSLYN_SENSOR_ENABLED).isPresent()) {
+      LOG.info("Roslyn Sensor not present - Disabled");
+      return;
+    }
+    
+    if (!settings.getBoolean(ROSLYN_SENSOR_ENABLED).get()) {
+      LOG.info("Roslyn Sensor - Disabled");
+      return;
+    } 
+    
     LOG.info("Execute Roslyn Sensor : " + context.fileSystem().baseDir());
     try {
       String solution = getSolution(context.fileSystem().baseDir(), context);

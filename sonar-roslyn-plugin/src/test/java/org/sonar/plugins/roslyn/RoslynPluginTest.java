@@ -46,6 +46,6 @@ public class RoslynPluginTest {
    Plugin.Context context = new Plugin.Context(mock(SonarRuntime.class));
    RoslynPlugin plugin = new RoslynPlugin();
    plugin.define(context);
-   assertEquals(12, context.getExtensions().size());   
+   assertEquals(13, context.getExtensions().size());   
   }
 }

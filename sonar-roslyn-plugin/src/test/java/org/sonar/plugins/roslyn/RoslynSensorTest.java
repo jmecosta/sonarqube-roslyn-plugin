@@ -45,7 +45,7 @@ public class RoslynSensorTest {
   public void finderWorks() throws IOException {
     File parent = new File(new File( "." ).getAbsolutePath()).getParentFile();
     File current = new File(parent.getParent(), "RoslynRunner").getAbsoluteFile();
-    RoslynSensor sensor = new RoslynSensor(null);
+    RoslynSensor sensor = new RoslynSensor(null, null);
     File [] files = sensor.finder(current, ".sln");    
     assertThat(files.length).isEqualTo(1);
   }
