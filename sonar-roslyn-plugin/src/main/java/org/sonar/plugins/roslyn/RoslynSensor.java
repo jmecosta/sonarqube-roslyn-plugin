@@ -211,26 +211,21 @@ public class RoslynSensor implements Sensor {
     }
 
     String username = getEmptyStringOrValue(ctx, "sonar.login");
-    String password = getEmptyStringOrValue(ctx, "sonar.password");
+    String token = getEmptyStringOrValue(ctx, "sonar.token");
+
+    if (username != "") {
+      token = username;
+    }
     
     Command command;
-    if (OsUtils.isWindows()) {
-      command = Command.create(executableFile.getAbsolutePath())
-              .addArgument("/i:" + analysisInput.getAbsolutePath())
-              .addArgument("/u:" + username)
-              .addArgument("/p:" + password)
-              .addArgument("/o:" + analysisOutput.getAbsolutePath());      
-    } else {
-      command = Command.create("mono")
-              .addArgument(executableFile.getAbsolutePath())
-              .addArgument("/i:" + analysisInput.getAbsolutePath())
-              .addArgument("/u:" + username)
-              .addArgument("/p:" + password)              
-              .addArgument("/o:" + analysisOutput.getAbsolutePath());  
-    }
+      command = Command.create("dotnet")
+          .addArgument(executableFile.getAbsolutePath())          
+          .addArgument("/i:" + analysisInput.getAbsolutePath())
+          .addArgument("/t:" + token)
+          .addArgument("/o:" + analysisOutput.getAbsolutePath());      
 
     command.setEnvironmentVariable("MSBUILDDISABLENODEREUSE", "1");
-    LOG.info(command.toCommandLine().replace(password, "xxxxxx"));
+    LOG.info(command.toCommandLine().replace(token, "xxxxxx"));
     CommandExecutor.create().execute(command, new LogInfoStreamConsumer(), new LogErrorStreamConsumer(), Integer.MAX_VALUE);
   }
 

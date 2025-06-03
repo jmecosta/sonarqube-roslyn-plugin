@@ -5,7 +5,7 @@
   <parent>
       <groupId>org.jmecsoftware.com.sonar-plugins.dotnet.roslyn</groupId>
       <artifactId>sonar-roslyn-squid</artifactId>
-      <version>1.0.1</version>
+      <version>1.0.2</version>
   </parent>
   
   <artifactId>sonar-roslyn-plugin</artifactId>

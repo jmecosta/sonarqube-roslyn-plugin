@@ -3,8 +3,6 @@
 open System
 open System.IO
 open System.Reflection
-open VSSonarPlugins
-open VSSonarPlugins.Types
 open SonarRestService
 open MSBuildHelper
 
@@ -12,6 +10,8 @@ open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.Diagnostics
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.MSBuild
+open SonarRestServiceImpl
+open SonarRestService.Types
 
 let ShowHelp () =
         Console.WriteLine ("Usage: RoslynRunner [OPTIONS]")
@@ -20,8 +20,7 @@ let ShowHelp () =
         Console.WriteLine ("Options:")
         Console.WriteLine ("    /I|/i:<input xml>")
         Console.WriteLine ("    /O|/o:<output xml file>")
-        Console.WriteLine ("    /U|/u:<username>")
-        Console.WriteLine ("    /P|/p:<password>")
+        Console.WriteLine ("    /T|/t:<token>")
         Console.WriteLine ("    /delete-all-rules")
     
 let GetDiagnostics(solution:string, externalAnalysers:string [], root : string) =
@@ -75,8 +74,7 @@ let main argv =
                 if File.Exists(output) then
                     File.Delete(output)
 
-                let username = try arguments.["u"] |> Seq.head with | ex -> "admin"
-                let userpassword = try arguments.["p"] |> Seq.head with | ex -> if username = "admin" then "admin" else ""
+                let token = try arguments.["t"] |> Seq.head with | ex -> "xxxx"
 
                 let optionsInput = XmlHelper.InputXml.Parse(File.ReadAllText(input))
 
@@ -90,8 +88,8 @@ let main argv =
                 let mutable diagnostiResults : Diagnostic list = List.Empty
                 let options = new XmlHelper.OptionsToUse()
                 options.ParseOptions(solutionPath, optionsInput)
-                let rest = new SonarRestService(new JsonSonarConnector()) :> ISonarRestService
-                let token = SonarHelpers.GetConnectionToken(rest, options.Url, username, userpassword)
+                let rest = new SonarService(new JsonSonarConnector()) :> ISonarRestService
+                let token = SonarHelpers.GetConnectionToken(rest, options.Url, token, "")
                 if arguments.ContainsKey("deleteallrules") then
                     let profiles = SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, true)
                     if profiles.ContainsKey("cs") then SonarHelpers.DeleteRoslynRulesInProfiles(rest, token, profiles.["cs"])

@@ -3,11 +3,10 @@
 open System
 open System.IO
 open System.Reflection
-open VSSonarPlugins
-open VSSonarPlugins.Types
 open SonarRestService
+open SonarRestService.Types
 
-let execPath = Directory.GetParent(Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", "")).ToString()
+let execPath = Directory.GetParent(Assembly.GetExecutingAssembly().Location).ToString()
 
 let CreateRulesWithDiagnostic(path : string, profiles : System.Collections.Generic.Dictionary<string, Profile>, rest : ISonarRestService, token : ISonarConfiguration, createRule : bool, enableRule : bool) = 
     let diags =  RoslynHelper.LoadDiagnosticsFromPath(path)
@@ -75,7 +74,7 @@ let CreateRulesWithDiagnostic(path : string, profiles : System.Collections.Gener
 
 let GetProfilesFromServer(projectKey : string,
                           service : ISonarRestService,
-                          token : VSSonarPlugins.Types.ISonarConfiguration,
+                          token : ISonarConfiguration,
                           loaddisablerules : bool) =
 
     let profileData : System.Collections.Generic.Dictionary<string, Profile> = new System.Collections.Generic.Dictionary<string, Profile>()
@@ -105,7 +104,7 @@ let GetProfilesFromServer(projectKey : string,
 
 let CreateAndAssignProfileInServer(projectKey : string,
                                    service : ISonarRestService,
-                                   token : VSSonarPlugins.Types.ISonarConfiguration,
+                                   token : ISonarConfiguration,
                                    diagnostics : Map<string, RoslynHelper.RosDiag List>) =
 
     let profileData : System.Collections.Generic.Dictionary<string, Profile> = new System.Collections.Generic.Dictionary<string, Profile>()
@@ -200,11 +199,11 @@ let SyncRulesInServer(paths : string [], baseroot : string, rest : ISonarRestSer
     diagnosticList
 
 let GetConnectionToken(service : ISonarRestService, address : string , userName : string, password : string) = 
-    let token = new VSSonarPlugins.Types.ConnectionConfiguration(address, userName, password, 4.5)
+    let token = new ConnectionConfiguration(address, userName, password, 4.5)
     token.SonarVersion <- float (service.GetServerInfo(token))
     token
 
-let DeleteRoslynRulesInProfiles(service : ISonarRestService, token : VSSonarPlugins.Types.ISonarConfiguration, profile : Profile) = 
+let DeleteRoslynRulesInProfiles(service : ISonarRestService, token : ISonarConfiguration, profile : Profile) = 
     let rules = profile.GetAllRules()
     for rule in rules do
         if rule.Key.StartsWith("roslyn-") && not(rule.IsTemplate) then

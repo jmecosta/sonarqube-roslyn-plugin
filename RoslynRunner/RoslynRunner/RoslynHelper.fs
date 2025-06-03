@@ -2,8 +2,6 @@
 
 open Microsoft.CodeAnalysis.Diagnostics
 
-open VSSonarPlugins
-open VSSonarPlugins.Types
 open System
 open System.IO
 open System.Reflection
@@ -15,6 +13,7 @@ open Microsoft.CodeAnalysis.Diagnostics
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.MSBuild
 open Microsoft.CodeAnalysis.Text
+open SonarRestService.Types
 
 
 type AnalyzerAdditionalFile(path : string) =
@@ -31,7 +30,7 @@ type RosDiag() =
 
 let LoadDiagnosticsFromPath(path : string) = 
     
-    let runningPath = Directory.GetParent(Assembly.GetExecutingAssembly().CodeBase.Replace("file:///", "")).ToString()
+    let runningPath = Directory.GetParent(Assembly.GetExecutingAssembly().Location).ToString()
 
     AppDomain.CurrentDomain.add_AssemblyResolve(fun _ args ->
             
@@ -162,7 +161,7 @@ let runRoslynOnCompilationUnit(compilation : Compilation, ids, builder : Diagnos
         ).WithSpecificDiagnosticOptions(ids)
         
     let compilationWithOptions = compilation.WithOptions(options)
-    let analyserMain = compilationWithOptions.WithAnalyzers(builder.ToImmutableArray(), optionsWithAdditionalFiles, (new CancellationTokenSource()).Token)
+    let analyserMain = compilationWithOptions.WithAnalyzers(builder.ToImmutableArray(), optionsWithAdditionalFiles)
 
     analyserMain.GetAnalyzerDiagnosticsAsync().Result
 

@@ -33,7 +33,6 @@
  */
 package org.sonar.plugins.roslyn;
 
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -55,53 +54,57 @@ public class UnZip
    * @param zipFile input zip file
    * @param output zip file output folder
    */
-  public void unZipIt(String zipFile, String outputFolder) throws IOException{
+public void unZipIt(String zipFile, String outputFolder) throws IOException {
 
     byte[] buffer = new byte[1024];
 
-    try{
+    try {
 
-      //create output directory is not exists
-      File folder = new File(outputFolder);
-      if(!folder.exists()){
-          folder.mkdir();
-      }
+        // Create output directory if it does not exist
+        File folder = new File(outputFolder);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
 
-      //get the zip file content
-      ZipInputStream zis =
-          new ZipInputStream(new FileInputStream(zipFile));
-      //get the zipped file list entry
-      ZipEntry ze = zis.getNextEntry();
+        // Get the zip file content
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+        // Get the zipped file list entry
+        ZipEntry ze = zis.getNextEntry();
 
-      while(ze!=null){
+        while (ze != null) {
 
-         String fileName = ze.getName();
-         File newFile = new File(outputFolder + File.separator + fileName);
+            String fileName = ze.getName();
+            File newFile = new File(outputFolder + File.separator + fileName);
 
-         LOG.debug("Unzip {}", newFile.getAbsolutePath());
+            LOG.debug("Unzipping {}", newFile.getAbsolutePath());
 
-          //create all non exists folders
-          //else you will hit FileNotFoundException for compressed folder
-          new File(newFile.getParent()).mkdirs();
+            if (ze.isDirectory()) {
+                // If the entry is a directory, create the directory
+                newFile.mkdirs();
+            } else {
+                // If the entry is a file, create all non-existing folders
+                // else you will hit FileNotFoundException for compressed folder
+                new File(newFile.getParent()).mkdirs();
 
-          FileOutputStream fos = new FileOutputStream(newFile);
+                // Write file content
+                FileOutputStream fos = new FileOutputStream(newFile);
+                int len;
+                while ((len = zis.read(buffer)) > 0) {
+                    fos.write(buffer, 0, len);
+                }
+                fos.close();
+            }
 
-          int len;
-          while ((len = zis.read(buffer)) > 0) {
-          fos.write(buffer, 0, len);
-          }
+            ze = zis.getNextEntry();
+        }
 
-          fos.close();
-          ze = zis.getNextEntry();
-      }
+        zis.closeEntry();
+        zis.close();
 
-      zis.closeEntry();
-      zis.close();
-
-      LOG.debug("Unzip Done.");
-    }catch(IOException ex){
-      LOG.error("Unzip Failed {}", ex.getMessage());
-      throw ex;
+        LOG.debug("Unzip Done.");
+    } catch (IOException ex) {
+        LOG.error("Unzip Failed {}", ex.getMessage());
+        throw ex;
     }
   }
 }

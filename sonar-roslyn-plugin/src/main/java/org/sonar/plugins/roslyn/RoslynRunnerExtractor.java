@@ -50,7 +50,7 @@ public class RoslynRunnerExtractor {
   public static final Logger LOG = Loggers.get(RoslynRunnerExtractor.class);
   private static final String N_SONARQUBE_ANALYZER = "RoslynRunner";
   private static final String N_SONARQUBE_ANALYZER_ZIP = N_SONARQUBE_ANALYZER + ".zip";
-  private static final String N_SONARQUBE_ANALYZER_EXE = N_SONARQUBE_ANALYZER + ".exe";
+  private static final String N_SONARQUBE_ANALYZER_DLL = N_SONARQUBE_ANALYZER + ".dll";
 
   private final ProjectReactor reactor;
   private File file = null;
@@ -61,7 +61,7 @@ public class RoslynRunnerExtractor {
 
   public File executableFile() throws IOException {
     if (file == null) {
-      file = unzipProjectCheckerFile(N_SONARQUBE_ANALYZER_EXE);
+      file = unzipProjectCheckerFile(N_SONARQUBE_ANALYZER_DLL);
     }
 
     return file;
@@ -78,7 +78,11 @@ public class RoslynRunnerExtractor {
 
     try {
 
-      
+      // Ensure the tool working directory exists
+      if (!toolWorkingDir.exists()) {
+        toolWorkingDir.mkdirs();
+      }
+
       try (InputStream is = getClass().getResourceAsStream("/" + N_SONARQUBE_ANALYZER_ZIP)) {
         Files.copy(is, zipFile.toPath());
       }
