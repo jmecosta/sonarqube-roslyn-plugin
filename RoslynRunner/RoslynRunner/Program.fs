@@ -1,4 +1,4 @@
-﻿// Learn more about F# at http://fsharp.org
+// Learn more about F# at http://fsharp.org
 // See the 'F# Tutorial' project for more help.
 open System
 open System.IO
@@ -21,6 +21,8 @@ let ShowHelp () =
         Console.WriteLine ("    /I|/i:<input xml>")
         Console.WriteLine ("    /O|/o:<output xml file>")
         Console.WriteLine ("    /T|/t:<token>")
+        Console.WriteLine ("    /P|/p:<projects analysed at the same time, default: half the processors> (or ROSLYN_RUNNER_PARALLELISM)")
+        Console.WriteLine ("    /B|/b:<projects per solution load, default: 32> (or ROSLYN_RUNNER_BATCH)")
         Console.WriteLine ("    /delete-all-rules")
         Console.WriteLine ("    /createrules /d:<dll-or-folder> /url:<sonar url> /t:<token>")
     
@@ -60,6 +62,7 @@ let GetDiagnostics(solution:string, externalAnalysers:string [], root : string) 
 [<EntryPoint>]
 let main argv = 
     let arguments = XmlHelper.parseArgs(argv)
+    let mutable exitCode = 0
     
     if arguments.ContainsKey("h") then
         ShowHelp()
@@ -72,6 +75,7 @@ let main argv =
         if dpath = "" || url = "" then
             Console.WriteLine ("    /createrules requires /d:<dll-or-folder> and /url:<sonar url>")
             ShowHelp()
+            exitCode <- 1
         else
             try
                 let token = try arguments.["t"] |> Seq.head with | _ -> "xxxx"
@@ -79,11 +83,14 @@ let main argv =
                 let conn = SonarHelpers.GetConnectionToken(rest, url, token, "")
                 SonarHelpers.CreateRulesInRepository(dpath, rest, conn)
             with
-            | ex -> printf "    Failed: %A" ex
+            | ex ->
+                eprintfn "    Failed: %A" ex
+                exitCode <- 1
     elif arguments.ContainsKey("i") then
         if not(arguments.ContainsKey("o")) then
             Console.WriteLine ("    Mission /O")
             ShowHelp()
+            exitCode <- 1
         else
             try
                 let input = arguments.["i"] |> Seq.head
@@ -134,23 +141,57 @@ let main argv =
                     printf "[RoslynRunner] : Get Profiles (read-only)\r\n"
                     let profiles = SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, false)
 
-                    for project in solutiondata.Projects do
-                        printf "[RoslynRunner] : Analyse: %s \r\n" project.Value.Path
-                        options.PopulateProjectOptions(project.Value.Path)
-                        if diagnostics.Count = 0 then
-                            printf "[RoslynRunner] : No diagnostics configured or found : see https://sites.google.com/site/jmecsoftware/ for more information\r\n"
-                        else
-                            for dll in diagnostics do
-                                if dll.Value.Length <> 0 then
-                                    printf "[RoslynRunner] : Run analyzers in : %s\r\n" dll.Key
-                                    let resourceswithissues = RoslynHelper.RunAnalysis(profiles, dll.Value, options)
-                                    resourceswithissues |> Seq.iter (fun x -> diagnostiResults <- diagnostiResults @ [x])
+                    if diagnostics.Count = 0 then
+                        printf "[RoslynRunner] : No diagnostics configured or found : see https://sites.google.com/site/jmecsoftware/ for more information\r\n"
+                    else
+                        let analyzers =
+                            diagnostics
+                            |> Map.toList
+                            |> List.filter (fun (_, diags) -> diags.Length <> 0)
+                            |> List.map (fun (dll, diags) -> dll, RoslynHelper.PrepareAnalyzers(profiles, diags))
+                        // the Sonar plugin passes only /i /t /o: the environment can set these too
+                        let setting (key : string) (envName : string) (fallback : int) =
+                            let value =
+                                if arguments.ContainsKey(key) then arguments.[key] |> Seq.head
+                                else Environment.GetEnvironmentVariable(envName)
+                            match Int32.TryParse(value) with
+                            | true, n when n > 0 -> n
+                            | _ -> fallback
+                        let parallelism = setting "p" "ROSLYN_RUNNER_PARALLELISM" (max 1 (Environment.ProcessorCount / 2))
+                        let batchSize = setting "b" "ROSLYN_RUNNER_BATCH" 32
+                        let projectPaths = solutiondata.Projects.Values |> Seq.map (fun p -> p.Path) |> Seq.toList
+                        printf "[RoslynRunner] : Analyse %i projects: %i at a time, solution loaded once per %i projects\r\n" projectPaths.Length parallelism batchSize
+                        // the analysis blocks on Roslyn tasks: enough pool threads so the parallel projects do not starve them
+                        let workers, ports = System.Threading.ThreadPool.GetMinThreads()
+                        System.Threading.ThreadPool.SetMinThreads(max workers (parallelism * 4), ports) |> ignore
+
+                        let analyseBatch (batch : string list) =
+                            // one workspace per batch, not per project; disposing it bounds the compilations kept in memory
+                            use workspace = MSBuildWorkspace.Create()
+                            let solution = workspace.OpenSolutionAsync(solutionPath).Result
+                            batch
+                            |> List.map (fun projectPath -> async {
+                                printf "[RoslynRunner] : Analyse: %s \r\n" projectPath
+                                let projectOptions = new XmlHelper.OptionsToUse()
+                                projectOptions.ParseOptions(solutionPath, optionsInput)
+                                projectOptions.PopulateProjectOptions(projectPath)
+                                return
+                                    [ for dll, prepared in analyzers do
+                                        printf "[RoslynRunner] : Run analyzers in : %s (%s)\r\n" dll (Path.GetFileName(projectPath))
+                                        yield! RoslynHelper.RunAnalysis(solution, profiles, prepared, projectOptions) ] })
+                            |> fun jobs -> Async.Parallel(jobs, maxDegreeOfParallelism = parallelism)
+                            |> Async.RunSynchronously
+                            |> List.concat
+
+                        diagnostiResults <- projectPaths |> List.chunkBySize batchSize |> List.collect analyseBatch
 
                     XmlHelper.WriteToOutputFile(output, diagnostiResults)
             with
-            | ex -> printf "    Failed: %A" ex
+            | ex ->
+                eprintfn "    Failed: %A" ex
+                exitCode <- 1
         ()
     else
         ShowHelp()
 
-    0
+    exitCode
