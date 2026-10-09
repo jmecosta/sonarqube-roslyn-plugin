@@ -165,27 +165,27 @@ let runRoslynOnCompilationUnit(compilation : Compilation, ids, builder : Diagnos
 
     analyserMain.GetAnalyzerDiagnosticsAsync().Result
 
-let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile>, roslynCheckers : RosDiag List, options : XmlHelper.OptionsToUse) =
+type PreparedAnalyzers =
+    { CSharp : DiagnosticAnalyzer list
+      VbNet : DiagnosticAnalyzer list
+      Ids : (string * ReportDiagnostic) list }
+
+// UpdateDiagnostics sets rule parameters on the shared analyzer instances: run it once, before projects are analysed in parallel
+let PrepareAnalyzers(profiles : System.Collections.Generic.Dictionary<string, Profile>, roslynCheckers : RosDiag List) =
+    let builder, ids = UpdateDiagnostics(profiles, roslynCheckers)
+    let analyzersFor (language : string) =
+        builder |> List.filter (fun c -> c.Languages |> Seq.contains language) |> List.map (fun c -> c.Analyser)
+    { CSharp = analyzersFor "C#"
+      VbNet = analyzersFor "VB"
+      Ids = ids |> List.map (fun kv -> kv.Key, kv.Value) }
+
+let RunAnalysis(solution : Solution, profiles : System.Collections.Generic.Dictionary<string, Profile>, prepared : PreparedAnalyzers, options : XmlHelper.OptionsToUse) =
     let mutable issuestoret = List.Empty
 
     try
-        use workspace = MSBuildWorkspace.Create()
-        let solution = workspace.OpenSolutionAsync(options.Solution).Result
-        let builder, ids = UpdateDiagnostics(profiles, roslynCheckers)
-               
-        let csharpDiags =
-            let mutable diagret = List.Empty
-            let diags = builder |> List.filter ( fun c -> c.Languages |> Seq.contains("C#"))
-            for diag in diags do
-                diagret <- diagret @ [diag.Analyser]
-            diagret
-
-        let vbnetDiags =
-            let mutable diagret = List.Empty
-            let diags = builder |> List.filter ( fun c -> c.Languages |> Seq.contains("VB"))
-            for diag in diags do
-                diagret <- diagret @ [diag.Analyser]
-            diagret
+        let ids = prepared.Ids |> List.map (fun (k, v) -> new System.Collections.Generic.KeyValuePair<string, ReportDiagnostic>(k, v))
+        let csharpDiags = prepared.CSharp
+        let vbnetDiags = prepared.VbNet
 
         if ids.Length > 0 then
             for project in solution.Projects do
@@ -257,7 +257,8 @@ let RunAnalysis(profiles : System.Collections.Generic.Dictionary<string, Profile
 
     with
     | ex -> 
-        printf "Failed to run diagnostics %s \r\n %s\n\r" ex.Message ex.StackTrace
+        eprintfn "Failed to run diagnostics %s\n%s" ex.Message ex.StackTrace
+        reraise()
 
     printf "[RoslynRunner] : Found %i issues\r\n" issuestoret.Length
     issuestoret

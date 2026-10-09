@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
 		<OutputType>Exe</OutputType>
-		<Version>2.0.0</Version>
+		<Version>2.1.0</Version>
 		<Version Condition="'$(VersionToUse)' != ''">$(VersionToUse)</Version>		
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageOutputPath>$(OutPutPathTasks)</PackageOutputPath>
@@ -26,7 +26,7 @@
 		<PackageReference Include="MsbuildAutomationHelper" Version="3.3.0" />
 		<PackageReference Include="Trimble.SonarRestApiImpl" Version="2.0.1" />
 	</ItemGroup>
-	<Target Name="ZipOutput" AfterTargets="Build">
+	<Target Name="ZipOutput" AfterTargets="Build" Condition="'$(SkipPluginPackaging)' != 'true'">
 		<PropertyGroup>
 			<!-- Define the output folder and zip file name -->
 			<OutputFolder>$(OutDir)</OutputFolder>

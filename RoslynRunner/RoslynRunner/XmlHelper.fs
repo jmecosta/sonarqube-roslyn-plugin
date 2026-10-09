@@ -1,4 +1,4 @@
-﻿module XmlHelper
+module XmlHelper
 
 open System
 open System.IO

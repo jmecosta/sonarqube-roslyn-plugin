@@ -1,4 +1,4 @@
-﻿module SonarHelpers
+module SonarHelpers
 
 open System
 open System.IO
