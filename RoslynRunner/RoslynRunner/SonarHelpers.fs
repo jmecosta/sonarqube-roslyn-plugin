@@ -198,7 +198,95 @@ let SyncRulesInServer(paths : string [], baseroot : string, rest : ISonarRestSer
 
     diagnosticList
 
-let GetConnectionToken(service : ISonarRestService, address : string , userName : string, password : string) = 
+// Read-only: load ONLY the diagnostic analyzers defined for the plugin (sonar.roslyn.diagnostic.path
+// plus the default UserDiagnostics folder). The scanner must never pull the solution's own
+// AnalyzerReferences (SDK NetAnalyzers, Interop/source generators, WinForms analyzers, etc.) nor
+// touch the server. Each configured path may be a DLL file or a folder containing diagnostic DLLs.
+let LoadDiagnostics(paths : string [], baseroot : string) =
+    let mutable diagnosticList = Map.empty
+    let mutable seen : Set<string> = Set.empty
+
+    let tryAddDll (file : string) =
+        let name = Path.GetFileNameWithoutExtension(file)
+        if File.Exists(file)
+           && not(seen.Contains(name))
+           && not(name.Contains("SonarLint"))
+           && not(name.Contains("SonarAnalyser")) then
+            seen <- seen.Add(name)
+            diagnosticList <- diagnosticList.Add(file, RoslynHelper.LoadDiagnosticsFromPath(file))
+
+    for path in paths do
+        if path <> "" then
+            let abspath =
+                if Path.IsPathRooted(path) then
+                    path
+                else
+                    Path.GetFullPath(Path.Combine(baseroot, path))
+
+            if Directory.Exists(abspath) then
+                for file in Directory.GetFiles(abspath, "*.dll") do
+                    tryAddDll file
+            elif File.Exists(abspath) then
+                tryAddDll abspath
+            else
+                printf "[RoslynRunner] %s PATH not found\r\n" abspath
+
+    diagnosticList
+
+// Stand-alone utility (invoked via /createrules): register the rules found in a diagnostic DLL
+// (or every *.dll in a folder) into the roslyn-cs / roslyn-vbnet repositories. Creation only -
+// activation is left to the user in the Sonar UI. Requires a token with admin rights.
+let CreateRulesInRepository(path : string, rest : ISonarRestService, token : ISonarConfiguration) =
+    let dlls =
+        if Directory.Exists(path) then
+            Directory.GetFiles(path, "*.dll")
+        elif File.Exists(path) then
+            [| path |]
+        else
+            printf "[RoslynRunner] path not found: %s\r\n" path
+            [||]
+
+    let mutable created = 0
+    for dll in dlls do
+        let diags = RoslynHelper.LoadDiagnosticsFromPath(dll)
+        for roslynanalyser in diags do
+            for lang in roslynanalyser.Languages do
+                let repoinserver, templaterule =
+                    if lang.ToLower().Equals("c#") then
+                        "roslyn-cs", new Rule(Name = "Template Rule", Key = "roslyn-cs:TemplateRule")
+                    else
+                        "roslyn-vbnet", new Rule(Name = "Template Rule", Key = "roslyn-vbnet:TemplateRule")
+
+                for diag in roslynanalyser.Analyser.SupportedDiagnostics do
+                    let rule = new Rule()
+                    rule.Severity <- Severity.MAJOR
+                    let desc = sprintf """<p>%s<a href="%s">Help Url</a></p>""" (diag.Description.ToString()) diag.HelpLinkUri
+                    let markdown = sprintf """*%s* [Help Url](%s)""" (diag.Description.ToString()) diag.HelpLinkUri
+                    rule.HtmlDescription <- desc
+                    rule.MarkDownDescription <- markdown
+                    rule.Key <- repoinserver + ":" + diag.Id
+                    rule.Name <- diag.Title.ToString()
+                    rule.Repo <- repoinserver
+
+                    try
+                        let errors = rest.CreateRule(token, rule, templaterule)
+                        if errors.Count <> 0 then
+                            printf "[RoslynRunner] Cannot create rule %s : %s\r\n" rule.Key errors.[0]
+                        else
+                            created <- created + 1
+                            let dic = new System.Collections.Generic.Dictionary<string, string>()
+                            dic.Add("markdown_description", markdown)
+                            let uerrors = rest.UpdateRule(token, rule.Key, dic)
+                            if uerrors.Count <> 0 then
+                                printf "[RoslynRunner] Created rule %s (markdown update failed: %s)\r\n" rule.Key uerrors.[0]
+                            else
+                                printf "[RoslynRunner] Created rule %s in %s\r\n" rule.Key repoinserver
+                    with
+                    | ex -> printf "[RoslynRunner] Error creating rule %s : %s\r\n" rule.Key ex.Message
+
+    printf "[RoslynRunner] Created %i rules\r\n" created
+
+let GetConnectionToken(service : ISonarRestService, address : string , userName : string, password : string) =
     let token = new ConnectionConfiguration(address, userName, password, 4.5)
     token.SonarVersion <- float (service.GetServerInfo(token))
     token

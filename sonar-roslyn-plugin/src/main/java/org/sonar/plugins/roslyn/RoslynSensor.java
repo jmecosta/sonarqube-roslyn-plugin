@@ -191,7 +191,6 @@ public class RoslynSensor implements Sensor {
     appendLine(sb, "      <ProjectKey>" + projectKey + "</ProjectKey>");
     appendLine(sb, "      <BranchKey>" + (getEmptyStringOrValue(ctx, "sonar.branch")) + "</BranchKey>");
     appendLine(sb, "      <EnableRules>" + (ctx.config().getBoolean(RoslynPlugin.ENABLE_RULES_KEY).get() ? "true" : "false") + "</EnableRules>");
-    appendLine(sb, "      <UseSonarWebProfile>" + (ctx.config().getBoolean(RoslynPlugin.SYNC_PROFILE_TYPE_KEY).get() ? "true" : "false") + "</UseSonarWebProfile>");
     appendLine(sb, "      <AdditionalFiles>" + additionalFilesString + "</AdditionalFiles>");
     appendLine(sb, "  </Settings>");
     appendLine(sb, "</AnalysisInput>");

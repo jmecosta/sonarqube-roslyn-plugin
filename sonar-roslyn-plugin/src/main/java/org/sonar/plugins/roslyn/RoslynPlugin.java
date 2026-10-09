@@ -74,13 +74,6 @@ public class RoslynPlugin implements Plugin {
       .type(PropertyType.BOOLEAN)
       .defaultValue("true")
       .description("Enables or disable roslyn sensor")
-      .build(),      
-      PropertyDefinition.builder(RoslynPlugin.SYNC_PROFILE_TYPE_KEY)
-      .name("Sync type")
-      .type(PropertyType.BOOLEAN)
-      .defaultValue("true")
-      .onQualifiers(Qualifiers.PROJECT)
-      .description("If true sonar will enforce profile define in sonar web, if false profile found in ruleset will be sync in sonar server. A new profile will be created per project. This will be ignored if sync type is false.  (might require 2 runs to have everything synched)")
       .build(),
       PropertyDefinition.builder(RoslynPlugin.ADDITIONAL_FILES_KEY)
         .name("Additional files key.")
@@ -115,7 +108,6 @@ public class RoslynPlugin implements Plugin {
   public static final String SOLUTION_KEY = "sonar.roslyn.solution";  
   public static final String DIAGNOSTICS_PATH_KEY = "sonar.roslyn.diagnostic.path";  
   public static final String ENABLE_RULES_KEY = "sonar.roslyn.enable.rules";
-  public static final String SYNC_PROFILE_TYPE_KEY = "sonar.roslyn.sync.type";
   public static final String ADDITIONAL_FILES_KEY = "sonar.roslyn.additional.files";
   public static final String ADDITIONAL_FILES_NAME_KEY = "sonar.roslyn.additional.name";
   public static final String ADDITIONAL_FILES_CONTENT_KEY = "sonar.roslyn.additional.content";

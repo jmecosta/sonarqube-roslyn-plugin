@@ -22,6 +22,7 @@ let ShowHelp () =
         Console.WriteLine ("    /O|/o:<output xml file>")
         Console.WriteLine ("    /T|/t:<token>")
         Console.WriteLine ("    /delete-all-rules")
+        Console.WriteLine ("    /createrules /d:<dll-or-folder> /url:<sonar url> /t:<token>")
     
 let GetDiagnostics(solution:string, externalAnalysers:string [], root : string) =
     let mutable paths : Map<string, string> = Map.empty
@@ -62,6 +63,23 @@ let main argv =
     
     if arguments.ContainsKey("h") then
         ShowHelp()
+    elif arguments.ContainsKey("createrules") then
+        // Stand-alone, user-run utility: register rules from a diagnostic DLL (or folder)
+        // into the roslyn-cs / roslyn-vbnet repositories. Requires a token with admin rights.
+        // Activation is left to the user in the Sonar UI. The scanner never writes rules.
+        let dpath = try arguments.["d"] |> Seq.head with | _ -> ""
+        let url = try arguments.["url"] |> Seq.head with | _ -> ""
+        if dpath = "" || url = "" then
+            Console.WriteLine ("    /createrules requires /d:<dll-or-folder> and /url:<sonar url>")
+            ShowHelp()
+        else
+            try
+                let token = try arguments.["t"] |> Seq.head with | _ -> "xxxx"
+                let rest = new SonarService(new JsonSonarConnector()) :> ISonarRestService
+                let conn = SonarHelpers.GetConnectionToken(rest, url, token, "")
+                SonarHelpers.CreateRulesInRepository(dpath, rest, conn)
+            with
+            | ex -> printf "    Failed: %A" ex
     elif arguments.ContainsKey("i") then
         if not(arguments.ContainsKey("o")) then
             Console.WriteLine ("    Mission /O")
@@ -105,22 +123,16 @@ let main argv =
                                 rule.Key <- "roslyn-cs:" + sup.Id
                                 let result = rest.DeleteRule(token, rule)
                                 printf "result: %A" result
-                else                    
+                else
                     printf "[RoslynRunner] : ProjectKey: %s \r\n" options.ProjectKey
-                    printf "[RoslynRunner] : Populate Diagnostics\r\n"
-                    let diagnosticRefs = GetDiagnostics(options.Solution, options.ExtenalDiagnostics, options.Root)
-                    printf "[RoslynRunner] : Sync Rules in Server\r\n"
-                    let diagnostics = SonarHelpers.SyncRulesInServer(diagnosticRefs, options.Root, rest, token, options.EnableRules, options.ProjectKey, true)
-                    let profiles = 
-                        if options.UseWebProfile then
-                            printf "[RoslynRunner] : Use Web Profile : Delete Complete Profile\r\n"
-                            SonarHelpers.DeleteCompleteProfile(token, rest, options.ProjectKey)
-                            printf "[RoslynRunner] : Get Profiles\r\n"
-                            SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, false)
-                        else
-                            // read rule set and enable all rules that might be disabled
-                            printf "[RoslynRunner] : Create and Assign Profile in Server\r\n"
-                            SonarHelpers.CreateAndAssignProfileInServer(options.ProjectKey, rest, token, diagnostics)
+                    printf "[RoslynRunner] : Load Diagnostics\r\n"
+                    // Scanner is read-only: it loads the analyzers locally and reads the
+                    // Sonar web profile to decide which rules are active. It never creates,
+                    // copies, activates or deletes rules/profiles in the server. Use the
+                    // /createrules utility (run by an admin) to register rules.
+                    let diagnostics = SonarHelpers.LoadDiagnostics(options.ExtenalDiagnostics, options.Root)
+                    printf "[RoslynRunner] : Get Profiles (read-only)\r\n"
+                    let profiles = SonarHelpers.GetProfilesFromServer(options.ProjectKey, rest, token, false)
 
                     for project in solutiondata.Projects do
                         printf "[RoslynRunner] : Analyse: %s \r\n" project.Value.Path

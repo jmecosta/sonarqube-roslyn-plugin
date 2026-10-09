@@ -65,8 +65,7 @@ type InputXml = XmlProvider<"""
       <SonarUrl>http://sonar</SonarUrl>
       <ProjectKey>key</ProjectKey>
       <BranchKey>key</BranchKey>      
-      <EnableRules>true</EnableRules>   
-      <UseSonarWebProfile>true</UseSonarWebProfile>   
+      <EnableRules>true</EnableRules>
       <AdditionalFiles>file1;file2</AdditionalFiles>
   </Settings>
 </AnalysisInput>
@@ -144,7 +143,8 @@ type OptionsToUse() =
         this.Url <- options.Settings.SonarUrl
         this.Root <- options.Settings.SolutionRoot
         this.AdditionalFiles <- options.Settings.AdditionalFiles.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)
-        this.UseWebProfile <- options.Settings.UseSonarWebProfile
+        // Scanner is read-only and always uses the Sonar web-defined profile.
+        this.UseWebProfile <- true
 
         let userDiagnosticsDefaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "VSSonarExtension", "Diagnostics", "UserDiagnostics" )
         this.ExtenalDiagnostics <- (Array.append (options.Settings.ExternalDiagnostics.Split([|';'|], StringSplitOptions.RemoveEmptyEntries)) [|userDiagnosticsDefaultPath|])

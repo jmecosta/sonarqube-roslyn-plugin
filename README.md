@@ -36,3 +36,24 @@ Ah and if you use Visual Studio 2013 your are in luck, you can you this there.
 
 ## Usage
 There are multiple ways of using it, but the simplest is to drop your analysers in some external location to the solution. Choco is a nice way of distributing those. And setup that path via SonarQube ui. And you are done.
+
+## Registering rules
+
+The scanner is **read-only**: during an analysis it loads the analyzers locally and reads the
+quality profile defined in the SonarQube web UI to decide which rules are active. It never
+creates, copies, activates or deletes rules/profiles on the server. This avoids the duplicated
+rules/profiles that the old per-project profile sync produced, and means scanner credentials do
+not need administration permissions.
+
+Rules are registered once, by a user with admin rights, using the bundled RoslynRunner utility:
+
+```
+RoslynRunner.exe /createrules /d:<dll-or-folder> /url:<sonar url> /t:<token>
+```
+
+- `/d:` path to a diagnostic DLL, or a folder (every `*.dll` in it is scanned).
+- `/url:` the SonarQube server URL.
+- `/t:` a user token with permission to administer rules.
+
+The rules are created in the `roslyn-cs` / `roslyn-vbnet` repositories. Activate them in the
+quality profile from the SonarQube UI.
