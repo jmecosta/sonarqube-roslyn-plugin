@@ -15,6 +15,7 @@ open Microsoft.CodeAnalysis.MSBuild
 open Microsoft.CodeAnalysis.Text
 open SonarRestService.Types
 
+let private currentProject = AsyncLocal<string>()
 
 type AnalyzerAdditionalFile(path : string) =
     inherit AdditionalText()
@@ -41,7 +42,14 @@ let LoadDiagnosticsFromPath(path : string) =
         if name.Name = "System.Windows.Interactivity" || name.Name = "FSharp.Core.resources" || name.Name.EndsWith(".resources") then
             null
         else
-            printf "Request to load %s %s\n\r" args.Name (path)
+            let projectContext =
+                if String.IsNullOrEmpty(currentProject.Value) then "shared initialization / solution loading"
+                else currentProject.Value
+            let requestingAssembly =
+                if isNull args.RequestingAssembly then "unknown"
+                else args.RequestingAssembly.FullName
+            Console.WriteLine("[RoslynRunner] : Project: {0} | Request to load: {1} | Requested by: {2} | Candidate: {3}",
+                              projectContext, args.Name, requestingAssembly, path)
             
             let existingAssembly = 
                 System.AppDomain.CurrentDomain.GetAssemblies()
@@ -180,6 +188,11 @@ let PrepareAnalyzers(profiles : System.Collections.Generic.Dictionary<string, Pr
       Ids = ids |> List.map (fun kv -> kv.Key, kv.Value) }
 
 let RunAnalysis(solution : Solution, profiles : System.Collections.Generic.Dictionary<string, Profile>, prepared : PreparedAnalyzers, options : XmlHelper.OptionsToUse) =
+    let previousProject = currentProject.Value
+    currentProject.Value <- options.ProjectPath
+    use projectScope =
+        { new IDisposable with
+            member _.Dispose() = currentProject.Value <- previousProject }
     let mutable issuestoret = List.Empty
 
     try
@@ -253,12 +266,13 @@ let RunAnalysis(solution : Solution, profiles : System.Collections.Generic.Dicti
                                 issuestoret <- issuestoret @ [issue]
 
         else
-            printf "[RoslynRunner] : No diagnostics enabled, skip execution.\n\r"
+            Console.WriteLine("[RoslynRunner] : Project: {0} | No diagnostics enabled, skip execution.", options.ProjectPath)
 
     with
     | ex -> 
-        eprintfn "Failed to run diagnostics %s\n%s" ex.Message ex.StackTrace
+        Console.Error.WriteLine("[RoslynRunner] : Project: {0} | Analysis failed: {1}", options.ProjectPath, ex.Message)
+        Console.Error.WriteLine(ex.StackTrace)
         reraise()
 
-    printf "[RoslynRunner] : Found %i issues\r\n" issuestoret.Length
+    Console.WriteLine("[RoslynRunner] : Project: {0} | Found {1} issues", options.ProjectPath, issuestoret.Length)
     issuestoret
